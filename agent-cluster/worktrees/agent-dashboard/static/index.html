@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能体集群监控 - Agent Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-card: #16213e;
+            --bg-card-hover: #1f2b47;
+            --text-primary: #e0e0e0;
+            --text-secondary: #888;
+            --accent-gold: #f0a500;
+            --accent-red: #ff6b6b;
+            --accent-green: #4ecdc4;
+            --accent-purple: #a855f7;
+            --accent-blue: #3b82f6;
+            --border-color: rgba(255, 255, 255, 0.08);
+        }
+        
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 24px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .header-left h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+        
+        .header-left p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+        
+        .header-right {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-4px);
+            background: var(--bg-card-hover);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        
+        .stat-icon.agents { background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); }
+        .stat-icon.tasks { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); }
+        .stat-icon.success { background: rgba(78, 205, 196, 0.15); color: var(--accent-green); }
+        .stat-icon.tokens { background: rgba(240, 165, 0, 0.15); color: var(--accent-gold); }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        /* Agent Section */
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-title i {
+            color: var(--accent-blue);
+        }
+        
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        
+        .agent-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+        
+        .agent-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+        
+        .agent-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .agent-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .agent-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .agent-avatar.chief { background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; }
+        .agent-avatar.coder { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+        .agent-avatar.hr { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+        .agent-avatar.analyst { background: linear-gradient(135deg, #06b6d4, #0891b2); color: white; }
+        .agent-avatar.ops { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
+        
+        .agent-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        .agent-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .status-badge.idle {
+            background: rgba(78, 205, 196, 0.15);
+            color: var(--accent-green);
+        }
+        
+        .status-badge.busy {
+            background: rgba(240, 165, 0, 0.15);
+            color: var(--accent-gold);
+        }
+        
+        .status-badge.error {
+            background: rgba(255, 107, 107, 0.15);
+            color: var(--accent-red);
+        }
+        
+        .status-badge.offline {
+            background: rgba(136, 136, 136, 0.15);
+            color: var(--text-secondary);
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .agent-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .agent-stat {
+            text-align: center;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+        
+        .agent-stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+        
+        .agent-stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        
+        .current-task {
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            font-size: 0.85rem;
+        }
+        
+        .current-task-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        
+        .current-task-value {
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* Tasks Section */
+        .tasks-section {
+            margin-bottom: 32px;
+        }
+        
+        .tasks-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .task-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 18px 22px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        
+        .task-card:hover {
+            background: var(--bg-card-hover);
+        }
+        
+        .task-info {
+            flex: 1;
+        }
+        
+        .task-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .task-meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 16px;
+        }
+        
+        .task-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .task-status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .task-status-badge.pending {
+            background: rgba(136, 136, 136, 0.15);
+            color: var(--text-secondary);
+        }
+        
+        .task-status-badge.running {
+            background: rgba(240, 165, 0, 0.15);
+            color: var(--accent-gold);
+        }
+        
+        .task-status-badge.completed {
+            background: rgba(78, 205, 196, 0.15);
+            color: var(--accent-green);
+        }
+        
+        .task-status-badge.failed {
+            background: rgba(255, 107, 107, 0.15);
+            color: var(--accent-red);
+        }
+        
+        /* Alerts Section */
+        .alerts-section {
+            margin-bottom: 32px;
+        }
+        
+        .alerts-list {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .alert-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 18px 22px;
+            border-left: 4px solid;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        
+        .alert-card:hover {
+            background: var(--bg-card-hover);
+        }
+        
+        .alert-card.error { border-left-color: var(--accent-red); }
+        .alert-card.warning { border-left-color: var(--accent-gold); }
+        .alert-card.info { border-left-color: var(--accent-blue); }
+        
+        .alert-content h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .alert-content p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .alert-time {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 48px;
+            color: var(--text-secondary);
+        }
+        
+        .no-data i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        /* Loading State */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            color: var(--text-secondary);
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .toast.success { border-left: 4px solid var(--accent-green); }
+        .toast.error { border-left: 4px solid var(--accent-red); }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 20px;
+                text-align: center;
+            }
+            
+            .header-right {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .agent-stats {
+                grid-template-columns: 1fr;
+            }
+            
+            .task-card {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1><i class="ri-robot-line"></i> 智能体集群监控</h1>
+                <p>实时监控 Chief/Coder/HR/Analyst/Ops 五个智能体的任务执行情况</p>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-secondary" onclick="refreshAll()">
+                    <i class="ri-refresh-line"></i> 刷新全部
+                </button>
+                <button class="btn btn-primary" onclick="triggerSync()">
+                    <i class="ri-sync-line"></i> 同步数据
+                </button>
+            </div>
+        </header>
+        
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon agents"><i class="ri-team-line"></i></div>
+                </div>
+                <div class="stat-label">智能体</div>
+                <div class="stat-value" id="total-agents">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon tasks"><i class="ri-task-line"></i></div>
+                </div>
+                <div class="stat-label">总任务</div>
+                <div class="stat-value" id="total-tasks">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon success"><i class="ri-check-double-line"></i></div>
+                </div>
+                <div class="stat-label">成功率</div>
+                <div class="stat-value" id="success-rate">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon tokens"><i class="ri-file-text-line"></i></div>
+                </div>
+                <div class="stat-label">Token 消耗</div>
+                <div class="stat-value" id="total-tokens">-</div>
+            </div>
+        </div>
+        
+        <!-- Agents Grid -->
+        <h2 class="section-title"><i class="ri-robot-line"></i> 智能体状态</h2>
+        <div class="agents-grid" id="agents">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <span>加载数据中...</span>
+            </div>
+        </div>
+        
+        <!-- Recent Tasks -->
+        <div class="tasks-section">
+            <h2 class="section-title"><i class="ri-list-check-2"></i> 最近任务</h2>
+            <div class="tasks-list" id="tasks">
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <span>加载任务中...</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Alerts -->
+        <div class="alerts-section">
+            <h2 class="section-title"><i class="ri-notification-3-line"></i> 最近告警</h2>
+            <div class="alerts-list" id="alerts"></div>
+        </div>
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="ri-check-circle-line"></i>
+        <span id="toast-message">操作成功</span>
+    </div>
+    
+    <script>
+        const API_BASE = '/api';
+        
+        // Agent avatars and colors mapping
+        const agentConfig = {
+            chief: { avatar: 'C', class: 'chief' },
+            coder: { avatar: 'CD', class: 'coder' },
+            hr: { avatar: 'HR', class: 'hr' },
+            analyst: { avatar: 'A', class: 'analyst' },
+            ops: { avatar: 'O', class: 'ops' }
+        };
+        
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toast-message');
+            const icon = toast.querySelector('i');
+            
+            toast.className = `toast ${type}`;
+            icon.className = type === 'success' ? 'ri-check-circle-line' : 'ri-error-warning-line';
+            toastMessage.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Format duration
+        function formatDuration(seconds) {
+            if (!seconds) return '-';
+            if (seconds < 60) return `${Math.round(seconds)}秒`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}分${Math.round(seconds % 60)}秒`;
+            return `${Math.floor(seconds / 3600)}小时${Math.floor((seconds % 3600) / 60)}分`;
+        }
+        
+        // Format number with commas
+        function formatNumber(num) {
+            if (!num) return '0';
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+        
+        // Format relative time
+        function formatRelativeTime(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = now - date;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+            
+            if (minutes < 1) return '刚刚';
+            if (minutes < 60) return `${minutes}分钟前`;
+            if (hours < 24) return `${hours}小时前`;
+            return `${days}天前`;
+        }
+        
+        // Load all data
+        async function loadData() {
+            try {
+                await Promise.all([
+                    loadStats(),
+                    loadAgents(),
+                    loadTasks(),
+                    loadAlerts()
+                ]);
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+        
+        // Load statistics
+        async function loadStats() {
+            try {
+                const stats = await fetch(`${API_BASE}/stats`).then(r => r.json());
+                document.getElementById('total-agents').textContent = stats.total_agents || 0;
+                document.getElementById('total-tasks').textContent = formatNumber(stats.total_tasks || 0);
+                document.getElementById('success-rate').textContent = (stats.success_rate || 0) + '%';
+                document.getElementById('total-tokens').textContent = formatNumber(stats.total_tokens || 0);
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        // Load agents
+        async function loadAgents() {
+            try {
+                const agents = await fetch(`${API_BASE}/agents`).then(r => r.json());
+                renderAgents(agents);
+            } catch (error) {
+                console.error('Error loading agents:', error);
+                document.getElementById('agents').innerHTML = '<div class="no-data"><i class="ri-error-warning-line"></i><p>加载失败，请检查服务器是否运行</p></div>';
+            }
+        }
+        
+        function renderAgents(agents) {
+            const container = document.getElementById('agents');
+            
+            if (!agents || agents.length === 0) {
+                container.innerHTML = '<div class="no-data"><i class="ri-robot-line"></i><p>暂无智能体</p></div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            agents.forEach(agent => {
+                const config = agentConfig[agent.name] || { avatar: '?', class: '' };
+                const stats = agent.statistics || {};
+                
+                const card = document.createElement('div');
+                card.className = 'agent-card';
+                card.innerHTML = `
+                    <div class="agent-header">
+                        <div class="agent-info">
+                            <div class="agent-avatar ${config.class}">${config.avatar}</div>
+                            <div>
+                                <div class="agent-name">${agent.display_name}</div>
+                                <div class="agent-desc">${agent.description || ''}</div>
+                            </div>
+                        </div>
+                        <div class="status-badge ${agent.status}">
+                            <span class="status-dot"></span>
+                            <span>${getStatusText(agent.status)}</span>
+                        </div>
+                    </div>
+                    <div class="agent-stats">
+                        <div class="agent-stat">
+                            <div class="agent-stat-value">${stats.total_tasks || 0}</div>
+                            <div class="agent-stat-label">总任务</div>
+                        </div>
+                        <div class="agent-stat">
+                            <div class="agent-stat-value">${stats.completed_tasks || 0}</div>
+                            <div class="agent-stat-label">已完成</div>
+                        </div>
+                        <div class="agent-stat">
+                            <div class="agent-stat-value">${stats.success_rate || 0}%</div>
+                            <div class="agent-stat-label">成功率</div>
+                        </div>
+                    </div>
+                    <div class="current-task">
+                        <div class="current-task-label">当前任务</div>
+                        <div class="current-task-value">${agent.current_task_id || '无'}</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        function getStatusText(status) {
+            const statusMap = {
+                'idle': '空闲',
+                'busy': '工作中',
+                'error': '错误',
+                'offline': '离线'
+            };
+            return statusMap[status] || status;
+        }
+        
+        // Load tasks
+        async function loadTasks() {
+            try {
+                const tasks = await fetch(`${API_BASE}/tasks?limit=10`).then(r => r.json());
+                renderTasks(tasks);
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+            }
+        }
+        
+        function renderTasks(tasks) {
+            const container = document.getElementById('tasks');
+            
+            if (!tasks || tasks.length === 0) {
+                container.innerHTML = '<div class="no-data"><i class="ri-task-line"></i><p>暂无任务</p></div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            tasks.forEach(task => {
+                const card = document.createElement('div');
+                card.className = 'task-card';
+                
+                card.innerHTML = `
+                    <div class="task-info">
+                        <div class="task-title">${task.title}</div>
+                        <div class="task-meta">
+                            <span><i class="ri-user-line"></i> ${task.agent_name || '-'}</span>
+                            <span><i class="ri-time-line"></i> ${formatRelativeTime(task.created_at)}</span>
+                            <span><i class="ri-timer-line"></i> ${formatDuration(task.duration)}</span>
+                        </div>
+                    </div>
+                    <div class="task-status-badge ${task.status}">${getTaskStatusText(task.status)}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        function getTaskStatusText(status) {
+            const statusMap = {
+                'pending': '等待中',
+                'running': '进行中',
+                'completed': '已完成',
+                'failed': '失败'
+            };
+            return statusMap[status] || status;
+        }
+        
+        // Load alerts
+        async function loadAlerts() {
+            try {
+                const alerts = await fetch(`${API_BASE}/alerts?limit=5`).then(r => r.json());
+                renderAlerts(alerts);
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+            }
+        }
+        
+        function renderAlerts(alerts) {
+            const container = document.getElementById('alerts');
+            
+            if (!alerts || alerts.length === 0) {
+                container.innerHTML = '<div class="no-data"><i class="ri-checkbox-multiple-blank-line"></i><p>暂无告警</p></div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            alerts.forEach(alert => {
+                const card = document.createElement('div');
+                card.className = `alert-card ${alert.severity}`;
+                
+                const icon = alert.severity === 'error' ? 'ri-error-warning-line' : 
+                             alert.severity === 'warning' ? 'ri-alarm-warning-line' : 
+                             'ri-information-line';
+                
+                card.innerHTML = `
+                    <div class="alert-content">
+                        <h4><i class="${icon}"></i> ${alert.title}</h4>
+                        <p>${alert.message || ''}</p>
+                    </div>
+                    <div class="alert-time">${formatRelativeTime(alert.created_at)}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        // Trigger sync
+        async function triggerSync() {
+            try {
+                showToast('同步数据中...');
+                const result = await fetch(`${API_BASE}/sync`, { method: 'POST' }).then(r => r.json());
+                if (result.success) {
+                    showToast('数据同步成功');
+                    await loadData();
+                } else {
+                    showToast('同步失败: ' + (result.error || '未知错误'), 'error');
+                }
+            } catch (error) {
+                showToast('同步请求失败', 'error');
+            }
+        }
+        
+        // Refresh all data
+        async function refreshAll() {
+            showToast('刷新数据中...');
+            await loadData();
+            showToast('数据已更新');
+        }
+        
+        // Initial load
+        loadData();
+        
+        // Auto refresh every 30 seconds
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>
